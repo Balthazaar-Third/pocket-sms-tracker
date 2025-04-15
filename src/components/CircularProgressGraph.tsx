@@ -50,7 +50,7 @@ const CircularProgressGraph: React.FC<CircularProgressGraphProps> = ({
           strokeWidth={strokeWidth}
         />
         
-        {/* Income arc */}
+        {/* Income arc - green */}
         <circle
           cx={size / 2}
           cy={size / 2}
@@ -63,7 +63,7 @@ const CircularProgressGraph: React.FC<CircularProgressGraphProps> = ({
           strokeLinecap="round"
         />
         
-        {/* Expense arc */}
+        {/* Expense arc - red */}
         <circle
           cx={size / 2}
           cy={size / 2}
@@ -74,30 +74,29 @@ const CircularProgressGraph: React.FC<CircularProgressGraphProps> = ({
           strokeDasharray={circumference}
           strokeDashoffset={expenseOffset}
           strokeLinecap="round"
-          className="transform rotate-180"
-          style={{ transformOrigin: "center" }}
+          transform={`rotate(180 ${size/2} ${size/2})`}
         />
       </svg>
       
       <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center">
-        <p className="text-sm font-medium text-gray-500">Balance</p>
-        <p className="text-2xl font-bold text-primary">₹{balance.toFixed(2)}</p>
+        <p className="text-sm font-medium text-white">Balance</p>
+        <p className="text-2xl font-bold text-white">₹{balance.toFixed(2)}</p>
       </div>
       
       <div className="mt-6 flex w-full justify-around">
         <div className="flex items-center">
-          <div className="h-3 w-3 rounded-full bg-success mr-2"></div>
+          <div className="h-3 w-3 rounded-full bg-[#4CAF50] mr-2"></div>
           <div>
-            <p className="text-xs text-gray-500">Income</p>
-            <p className="text-sm font-semibold">₹{totalIncome.toFixed(2)}</p>
+            <p className="text-xs text-white">Income</p>
+            <p className="text-sm font-semibold text-white">₹{totalIncome.toFixed(2)}</p>
           </div>
         </div>
         
         <div className="flex items-center">
-          <div className="h-3 w-3 rounded-full bg-destructive mr-2"></div>
+          <div className="h-3 w-3 rounded-full bg-[#FF5252] mr-2"></div>
           <div>
-            <p className="text-xs text-gray-500">Expense</p>
-            <p className="text-sm font-semibold">₹{totalExpense.toFixed(2)}</p>
+            <p className="text-xs text-white">Expense</p>
+            <p className="text-sm font-semibold text-white">₹{totalExpense.toFixed(2)}</p>
           </div>
         </div>
       </div>

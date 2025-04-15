@@ -83,16 +83,15 @@ export const SMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Function to simulate receiving an SMS for testing
   const mockReceiveSMS = (message: string): void => {
-    if (processSMS(message)) {
-      // This is handled inside processSMS which returns a boolean
-      // Not doing anything additional here, as the toast is shown in processSMS
-    } else {
+    const success = processSMS(message);
+    if (!success) {
       toast({
         title: "Not a Transaction",
         description: "The message doesn't appear to be a transaction.",
         variant: "destructive",
       });
     }
+    // Note: If success is true, the toast is shown inside processSMS
   };
 
   return (
