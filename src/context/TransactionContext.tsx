@@ -1,9 +1,7 @@
-
 import React, { createContext, useState, useContext, useEffect } from "react";
 import { Transaction, TransactionSummary, TransactionType } from "@/types/transaction";
 import { useToast } from "@/hooks/use-toast";
 import { v4 as uuidv4 } from "uuid";
-import { processSMSMessage } from "@/services/smsProcessingService";
 
 interface TransactionContextType {
   transactions: Transaction[];
@@ -85,41 +83,145 @@ export const TransactionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     });
   };
 
+  // Generate a simple hash for SMS message to avoid duplicates
+  const generateSMSHash = (message: string): string => {
+    return message.trim().replace(/\s+/g, ' ').toLowerCase();
+  };
+
   // Process SMS messages to extract transaction information
   const processSMS = (message: string): boolean => {
-    // Ensure the message is not empty
-    if (!message.trim()) {
-      console.log("Empty message, skipping processing");
+    console.log("Processing SMS:", message);
+    
+    if (!message || typeof message !== 'string') {
+      console.error("Invalid SMS message:", message);
       return false;
     }
     
-    console.log("Processing SMS in TransactionContext:", message);
-    const { transaction, smsHash } = processSMSMessage(message);
-    
-    // Check if this SMS has already been processed
-    if (processedSMSHashes.has(smsHash)) {
-      console.log("SMS already processed, skipping:", smsHash);
-      toast({
-        title: "Already Processed",
-        description: "This SMS has already been processed",
-      });
+    try {
+      // Check if this SMS has already been processed
+      const smsHash = generateSMSHash(message);
+      if (processedSMSHashes.has(smsHash)) {
+        console.log("SMS already processed, skipping:", smsHash);
+        toast({
+          title: "Already Processed",
+          description: "This SMS has already been processed",
+        });
+        return false;
+      }
+      
+      // Check for bank credit/debit patterns - more comprehensive patterns
+      // Pattern 1: Standard banking SMS with Rs/INR followed by amount
+      const standardPattern = /(credited|debited|received|paid|sent|transfer|payment)(?:.*?)(Rs\.?|INR|₹)\s*([0-9,.]+)/i;
+      
+      // Pattern 2: A/c X6161-credited by Rs.150 format
+      const accountPattern = /(?:A\/c|account)[\s\-]*[A-Z0-9]+[\s\-]*(credited|debited)(?:.*?)(Rs\.?|INR|₹)\s*([0-9,.]+)/i;
+      
+      // Pattern 3: Direct amount mention at beginning (Rs.300.00 is debited)
+      const directAmountPattern = /(Rs\.?|INR|₹)\s*([0-9,.]+)(?:.*?)(credited|debited|received|paid|sent|transfer|payment)/i;
+      
+      // Pattern 4: Simple amount mention (150 rs.)
+      const simpleAmountPattern = /(\d+(?:\.\d+)?)\s*(?:rs\.?|rupees|inr|₹)/i;
+      
+      // Try all patterns
+      let match = message.match(standardPattern) || 
+                 message.match(accountPattern) || 
+                 message.match(directAmountPattern) ||
+                 message.match(simpleAmountPattern);
+      
+      if (match) {
+        console.log("Match found:", match);
+        
+        // Extract amount based on which pattern matched
+        let amount = 0;
+        let amountStr;
+        let actionWord = "";
+        
+        if (match === message.match(simpleAmountPattern)) {
+          // Simple amount pattern
+          amountStr = match[1];
+          // Default to income for simple patterns unless explicitly mentioned otherwise
+          actionWord = message.toLowerCase().includes("debit") || 
+                      message.toLowerCase().includes("paid") || 
+                      message.toLowerCase().includes("payment") ? 
+                      "debited" : "credited";
+        } else if (match === message.match(directAmountPattern)) {
+          // Direct amount pattern has amount in second group
+          amountStr = match[2];
+          actionWord = match[3].toLowerCase();
+        } else if (match === message.match(standardPattern) || match === message.match(accountPattern)) {
+          // Other patterns have amount in third group
+          amountStr = match[3];
+          actionWord = match[1].toLowerCase();
+        }
+        
+        // Remove commas and convert to number
+        amount = parseFloat(amountStr.replace(/,/g, ''));
+        
+        if (isNaN(amount) || amount <= 0) {
+          console.log("Invalid amount detected:", amountStr);
+          return false;
+        }
+        
+        // Determine if this is income or expense
+        let type: TransactionType = "expense";
+        if (actionWord.includes("credit") || 
+            actionWord.includes("receiv") || 
+            actionWord.includes("transfer from")) {
+          type = "income";
+        }
+        
+        // Extract possible sender/receiver name
+        let description = type === "income" ? "Income via SMS" : "Expense via SMS";
+        
+        // Look for sender/receiver name patterns
+        const fromPattern = /(?:from|by|transfer from|received from)\s+([A-Za-z0-9\s]+)/i;
+        const toPattern = /(?:to|towards|paid to|sent to)\s+([A-Za-z0-9\s]+)/i;
+        
+        const fromMatch = message.match(fromPattern);
+        const toMatch = message.match(toPattern);
+        
+        if (type === "income" && fromMatch) {
+          description = `From ${fromMatch[1].trim()}`;
+        } else if (type === "expense" && toMatch) {
+          description = `To ${toMatch[1].trim()}`;
+        }
+        
+        // Extract reference number if present
+        const refPattern = /(?:ref|reference|txn|transaction)(?:.*?)([A-Za-z0-9]+)/i;
+        const refMatch = message.match(refPattern);
+        
+        if (refMatch) {
+          description += ` (Ref: ${refMatch[1]})`;
+        }
+        
+        console.log(`Detected transaction: ${type}, amount: ${amount}, description: ${description}`);
+        
+        const newTransaction: Transaction = {
+          id: uuidv4(),
+          amount,
+          description,
+          type,
+          date: new Date().toISOString(),
+          fromSMS: true,
+        };
+        
+        setTransactions((prev) => [newTransaction, ...prev]);
+        
+        // Mark this SMS as processed
+        setProcessedSMSHashes((prev) => new Set([...prev, smsHash]));
+        
+        toast({
+          title: "SMS Transaction Detected",
+          description: `${description}: ₹${amount}`,
+        });
+        
+        return true;
+      }
+      
+      console.log("No transaction pattern detected in SMS");
       return false;
-    }
-    
-    if (transaction) {
-      setTransactions((prev) => [transaction, ...prev]);
-      
-      // Mark this SMS as processed
-      setProcessedSMSHashes((prev) => new Set([...prev, smsHash]));
-      
-      toast({
-        title: "Transaction Detected",
-        description: `${transaction.description}: ₹${transaction.amount}`,
-      });
-      
-      return true;
-    } else {
-      console.log("No transaction detected in SMS");
+    } catch (error) {
+      console.error("Error processing SMS:", error);
       return false;
     }
   };
