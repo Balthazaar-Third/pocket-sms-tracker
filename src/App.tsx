@@ -17,9 +17,13 @@ import AddTransactionPage from "@/pages/AddTransactionPage";
 import SMSSimulatorPage from "@/pages/SMSSimulatorPage";
 import NotFound from "@/pages/NotFound";
 
+// Create a new QueryClient instance
 const queryClient = new QueryClient();
 
+// Main App component
 const App = () => {
+  console.log("Rendering main App component");
+  
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
