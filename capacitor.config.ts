@@ -2,7 +2,7 @@
 import { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'app.lovable.395c4b86f7e64d16b9432e87899bac7b',
+  appId: 'com.lovable.pocketsms',
   appName: 'pocket-sms-tracker',
   webDir: 'dist',
   server: {
