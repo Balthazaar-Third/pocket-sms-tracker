@@ -19,80 +19,82 @@ import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <BrowserRouter>
-      <AuthProvider>
-        <TransactionProvider>
-          <SMSProvider>
-            <TooltipProvider>
-              <Toaster />
-              <Sonner />
-              <Routes>
-                <Route path="/login" element={<LoginPage />} />
-                
-                <Route
-                  path="/onboarding"
-                  element={
-                    <ProtectedRoute>
-                      <OnboardingPage />
-                    </ProtectedRoute>
-                  }
-                />
-                
-                <Route
-                  path="/"
-                  element={
-                    <ProtectedRoute>
-                      <HomePage />
-                    </ProtectedRoute>
-                  }
-                />
-                
-                <Route
-                  path="/transactions"
-                  element={
-                    <ProtectedRoute>
-                      <TransactionsPage />
-                    </ProtectedRoute>
-                  }
-                />
-                
-                <Route
-                  path="/add-income"
-                  element={
-                    <ProtectedRoute>
-                      <AddTransactionPage />
-                    </ProtectedRoute>
-                  }
-                />
-                
-                <Route
-                  path="/add-expense"
-                  element={
-                    <ProtectedRoute>
-                      <AddTransactionPage />
-                    </ProtectedRoute>
-                  }
-                />
-                
-                <Route
-                  path="/sms-simulator"
-                  element={
-                    <ProtectedRoute>
-                      <SMSSimulatorPage />
-                    </ProtectedRoute>
-                  }
-                />
-                
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </TooltipProvider>
-          </SMSProvider>
-        </TransactionProvider>
-      </AuthProvider>
-    </BrowserRouter>
-  </QueryClientProvider>
-);
+const App = () => {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <TooltipProvider>
+          <AuthProvider>
+            <TransactionProvider>
+              <SMSProvider>
+                <Toaster />
+                <Sonner />
+                <Routes>
+                  <Route path="/login" element={<LoginPage />} />
+                  
+                  <Route
+                    path="/onboarding"
+                    element={
+                      <ProtectedRoute>
+                        <OnboardingPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  
+                  <Route
+                    path="/"
+                    element={
+                      <ProtectedRoute>
+                        <HomePage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  
+                  <Route
+                    path="/transactions"
+                    element={
+                      <ProtectedRoute>
+                        <TransactionsPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  
+                  <Route
+                    path="/add-income"
+                    element={
+                      <ProtectedRoute>
+                        <AddTransactionPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  
+                  <Route
+                    path="/add-expense"
+                    element={
+                      <ProtectedRoute>
+                        <AddTransactionPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  
+                  <Route
+                    path="/sms-simulator"
+                    element={
+                      <ProtectedRoute>
+                        <SMSSimulatorPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </SMSProvider>
+            </TransactionProvider>
+          </AuthProvider>
+        </TooltipProvider>
+      </BrowserRouter>
+    </QueryClientProvider>
+  );
+};
 
 export default App;
