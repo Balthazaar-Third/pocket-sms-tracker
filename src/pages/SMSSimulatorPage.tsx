@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useSMS } from "@/context/SMSContext";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const SMSSimulatorPage: React.FC = () => {
@@ -43,7 +43,7 @@ const SMSSimulatorPage: React.FC = () => {
     "You have received Rs. 1000.00 from JOHN DOE to your account via UPI. Reference: UPI987654321.",
     "Your account has been debited for Rs. 350.50 towards UPI transfer to GROCERY MART.",
     "UPI: Rs. 750.00 credited to your account from ALICE SMITH. UPI Ref: 246813579.",
-    "Dear ABC User, your A/c X6161-credited by Rs.150 on 30Mar25 transfer from John Doe R Ref No 12345678900 -ABC"
+    "Dear ABC User, your A/c X6161-credited by Rs.150 on 15Apr25 transfer from John Doe R Ref No 12345678900 -ABC"
   ];
 
   return (
@@ -64,6 +64,20 @@ const SMSSimulatorPage: React.FC = () => {
         <p className="text-white/80 text-sm">
           Test the SMS transaction detection by simulating incoming messages
         </p>
+      </div>
+      
+      {/* Info box */}
+      <div className="bg-blue-50 p-4 mx-6 my-4 rounded-md border border-blue-200">
+        <div className="flex items-start">
+          <Info size={20} className="text-blue-500 mt-0.5 mr-2 flex-shrink-0" />
+          <div>
+            <h3 className="font-medium text-blue-700">How it works</h3>
+            <p className="text-sm text-blue-600 mt-1">
+              The app detects transaction information from SMS messages. Each message is processed only once to avoid duplicates.
+              Include amount (like "Rs. 150") and transaction type (debit/credit) for best results.
+            </p>
+          </div>
+        </div>
       </div>
       
       {/* Form */}

@@ -15,6 +15,7 @@ const TransactionContext = createContext<TransactionContextType | undefined>(und
 
 export const TransactionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [processedSMSHashes, setProcessedSMSHashes] = useState<Set<string>>(new Set());
   const { toast } = useToast();
 
   // Load transactions from localStorage on mount
@@ -23,12 +24,23 @@ export const TransactionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     if (storedTransactions) {
       setTransactions(JSON.parse(storedTransactions));
     }
+    
+    // Load processed SMS hashes
+    const storedHashes = localStorage.getItem("processedSMSHashes");
+    if (storedHashes) {
+      setProcessedSMSHashes(new Set(JSON.parse(storedHashes)));
+    }
   }, []);
 
   // Save transactions to localStorage whenever they change
   useEffect(() => {
     localStorage.setItem("transactions", JSON.stringify(transactions));
   }, [transactions]);
+  
+  // Save processed SMS hashes whenever they change
+  useEffect(() => {
+    localStorage.setItem("processedSMSHashes", JSON.stringify([...processedSMSHashes]));
+  }, [processedSMSHashes]);
 
   // Calculate summary
   const summary = transactions.reduce(
@@ -71,6 +83,11 @@ export const TransactionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     });
   };
 
+  // Generate a simple hash for SMS message to avoid duplicates
+  const generateSMSHash = (message: string): string => {
+    return message.trim().replace(/\s+/g, ' ').toLowerCase();
+  };
+
   // Process SMS messages to extract transaction information
   const processSMS = (message: string): boolean => {
     console.log("Processing SMS:", message);
@@ -81,6 +98,17 @@ export const TransactionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
     
     try {
+      // Check if this SMS has already been processed
+      const smsHash = generateSMSHash(message);
+      if (processedSMSHashes.has(smsHash)) {
+        console.log("SMS already processed, skipping:", smsHash);
+        toast({
+          title: "Already Processed",
+          description: "This SMS has already been processed",
+        });
+        return false;
+      }
+      
       // Check for bank credit/debit patterns - more comprehensive patterns
       // Pattern 1: Standard banking SMS with Rs/INR followed by amount
       const standardPattern = /(credited|debited|received|paid|sent|transfer|payment)(?:.*?)(Rs\.?|INR|₹)\s*([0-9,.]+)/i;
@@ -91,8 +119,14 @@ export const TransactionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       // Pattern 3: Direct amount mention at beginning (Rs.300.00 is debited)
       const directAmountPattern = /(Rs\.?|INR|₹)\s*([0-9,.]+)(?:.*?)(credited|debited|received|paid|sent|transfer|payment)/i;
       
+      // Pattern 4: Simple amount mention (150 rs.)
+      const simpleAmountPattern = /(\d+(?:\.\d+)?)\s*(?:rs\.?|rupees|inr|₹)/i;
+      
       // Try all patterns
-      let match = message.match(standardPattern) || message.match(accountPattern) || message.match(directAmountPattern);
+      let match = message.match(standardPattern) || 
+                 message.match(accountPattern) || 
+                 message.match(directAmountPattern) ||
+                 message.match(simpleAmountPattern);
       
       if (match) {
         console.log("Match found:", match);
@@ -100,13 +134,21 @@ export const TransactionProvider: React.FC<{ children: React.ReactNode }> = ({ c
         // Extract amount based on which pattern matched
         let amount = 0;
         let amountStr;
-        let actionWord;
+        let actionWord = "";
         
-        if (match === message.match(directAmountPattern)) {
+        if (match === message.match(simpleAmountPattern)) {
+          // Simple amount pattern
+          amountStr = match[1];
+          // Default to income for simple patterns unless explicitly mentioned otherwise
+          actionWord = message.toLowerCase().includes("debit") || 
+                      message.toLowerCase().includes("paid") || 
+                      message.toLowerCase().includes("payment") ? 
+                      "debited" : "credited";
+        } else if (match === message.match(directAmountPattern)) {
           // Direct amount pattern has amount in second group
           amountStr = match[2];
           actionWord = match[3].toLowerCase();
-        } else {
+        } else if (match === message.match(standardPattern) || match === message.match(accountPattern)) {
           // Other patterns have amount in third group
           amountStr = match[3];
           actionWord = match[1].toLowerCase();
@@ -164,6 +206,9 @@ export const TransactionProvider: React.FC<{ children: React.ReactNode }> = ({ c
         };
         
         setTransactions((prev) => [newTransaction, ...prev]);
+        
+        // Mark this SMS as processed
+        setProcessedSMSHashes((prev) => new Set([...prev, smsHash]));
         
         toast({
           title: "SMS Transaction Detected",

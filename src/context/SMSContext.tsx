@@ -61,10 +61,10 @@ export const SMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // Simulate a delay for scanning
       await new Promise<void>((resolve) => setTimeout(resolve, 2000));
       
-      // Sample SMS messages for simulation
+      // Sample SMS messages that mirror real-world transaction messages
       const sampleSMS = [
-        "Dear ABC User, your A/c X6161-credited by Rs.150 on 30Mar25 transfer from John Doe R Ref No 12345678900 -ABC",
-        "Rs.300.00 is debited from your account for purchase at CAFE COFFEE DAY on 25-03-25. Avl Bal: Rs.1250.20",
+        "Dear ABC User, your A/c X6161-credited by Rs.150 on 15Apr25 transfer from John Doe R Ref No 12345678900 -ABC",
+        "Rs.300.00 is debited from your account for purchase at CAFE COFFEE DAY on 15-04-25. Avl Bal: Rs.1500.20",
         "Your account has been credited with Rs.1000 via UPI transfer from JAMES SMITH. Ref: UPI123456789"
       ];
       
