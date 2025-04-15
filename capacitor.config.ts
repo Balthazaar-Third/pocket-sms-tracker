@@ -17,7 +17,12 @@ const config: CapacitorConfig = {
     },
   },
   android: {
-    allowMixedContent: true
+    allowMixedContent: true,
+    buildOptions: {
+      gradleArgs: [
+        "-Pkotlin.version=1.8.22"
+      ]
+    }
   }
 };
 
