@@ -4,12 +4,13 @@ import { useNavigate } from "react-router-dom";
 import { useSMS } from "@/context/SMSContext";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Info } from "lucide-react";
+import { ArrowLeft, Info, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { format } from "date-fns";
 
 const SMSSimulatorPage: React.FC = () => {
   const [message, setMessage] = useState("");
-  const { mockReceiveSMS, isPermissionGranted, requestPermission } = useSMS();
+  const { mockReceiveSMS, isPermissionGranted, requestPermission, lastScanTime, readSMS } = useSMS();
   const navigate = useNavigate();
   const { toast } = useToast();
   
@@ -38,12 +39,17 @@ const SMSSimulatorPage: React.FC = () => {
     setMessage(sample);
   };
   
+  const handleRefreshSMS = () => {
+    readSMS();
+  };
+  
   const sampleMessages = [
-    "UPI: Payment of Rs. 500.00 to CAFE COFFEE DAY successful. UPI Ref: 123456789.",
-    "You have received Rs. 1000.00 from JOHN DOE to your account via UPI. Reference: UPI987654321.",
-    "Your account has been debited for Rs. 350.50 towards UPI transfer to GROCERY MART.",
-    "UPI: Rs. 750.00 credited to your account from ALICE SMITH. UPI Ref: 246813579.",
-    "Dear ABC User, your A/c X6161-credited by Rs.150 on 15Apr25 transfer from John Doe R Ref No 12345678900 -ABC"
+    "UPI: Payment of Rs.250.00 to CAFE COFFEE DAY successful. UPI Ref: 123456789.",
+    "You have received Rs.1200.00 from JOHN DOE to your account via UPI. Reference: UPI987654321.",
+    "150 rs transferred to COFFEE SHOP. UPI ID: coffee@paytm. Txn ID: TXN123456789.",
+    "UPI Alert: You've paid Rs.599.00 to AMAZON.IN. UPI Ref No.123XYZ. Balance: Rs.2504.24",
+    "Money has landed! Rs.750 received via UPI from PhonePe. UPI Ref: 246813579P2P.",
+    "Payment of Rs.2499 successful to FLIPKART using UPI. Txn ID: F2499CART. Remaining balance: Rs.3500."
   ];
 
   return (
@@ -66,15 +72,43 @@ const SMSSimulatorPage: React.FC = () => {
         </p>
       </div>
       
-      {/* Info box */}
+      {/* Last Scan Info */}
       <div className="bg-blue-50 p-4 mx-6 my-4 rounded-md border border-blue-200">
         <div className="flex items-start">
           <Info size={20} className="text-blue-500 mt-0.5 mr-2 flex-shrink-0" />
-          <div>
-            <h3 className="font-medium text-blue-700">How it works</h3>
+          <div className="flex-1">
+            <h3 className="font-medium text-blue-700">SMS Scanning Information</h3>
             <p className="text-sm text-blue-600 mt-1">
-              The app detects transaction information from SMS messages. Each message is processed only once to avoid duplicates.
-              Include amount (like "Rs. 150") and transaction type (debit/credit) for best results.
+              {lastScanTime ? (
+                <>Last scanned: {format(new Date(lastScanTime), "MMM d, yyyy 'at' h:mm a")}</>
+              ) : (
+                <>No previous scan detected. First scan will check messages from the last 30 days.</>
+              )}
+            </p>
+            <div className="mt-3">
+              <Button 
+                onClick={handleRefreshSMS} 
+                variant="outline" 
+                className="bg-white text-blue-600 border-blue-300 hover:bg-blue-100"
+                size="sm"
+              >
+                <RefreshCw size={16} className="mr-2" />
+                Scan SMS Messages
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      {/* Info box */}
+      <div className="bg-gray-50 p-4 mx-6 my-4 rounded-md border border-gray-200">
+        <div className="flex items-start">
+          <Info size={20} className="text-gray-500 mt-0.5 mr-2 flex-shrink-0" />
+          <div>
+            <h3 className="font-medium text-gray-700">How it works</h3>
+            <p className="text-sm text-gray-600 mt-1">
+              The app detects UPI and other transaction information from SMS messages. Each message is processed only once to avoid duplicates.
+              The system scans messages based on when you last checked - if it's been a long time, it scans further back in your message history.
             </p>
           </div>
         </div>
@@ -102,7 +136,7 @@ const SMSSimulatorPage: React.FC = () => {
         </form>
         
         <div className="mt-8">
-          <h3 className="font-medium mb-3 text-gray-700">Sample Messages</h3>
+          <h3 className="font-medium mb-3 text-gray-700">Sample UPI Messages</h3>
           <div className="space-y-2">
             {sampleMessages.map((sample, index) => (
               <div

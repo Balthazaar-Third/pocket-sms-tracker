@@ -1,3 +1,4 @@
+
 import React, { createContext, useState, useContext, useEffect } from "react";
 import { Transaction, TransactionSummary, TransactionType } from "@/types/transaction";
 import { useToast } from "@/hooks/use-toast";
@@ -108,91 +109,122 @@ export const TransactionProvider: React.FC<{ children: React.ReactNode }> = ({ c
         });
         return false;
       }
+
+      // ====== Pattern detection for transactions ======
       
-      // Check for bank credit/debit patterns - more comprehensive patterns
-      // Pattern 1: Standard banking SMS with Rs/INR followed by amount
-      const standardPattern = /(credited|debited|received|paid|sent|transfer|payment)(?:.*?)(Rs\.?|INR|₹)\s*([0-9,.]+)/i;
+      // UPI-specific patterns
+      const upiPattern = /(?:upi|paytm|phonepe|googlepay|gpay)/i;
+      const isUpiRelated = upiPattern.test(message);
       
-      // Pattern 2: A/c X6161-credited by Rs.150 format
-      const accountPattern = /(?:A\/c|account)[\s\-]*[A-Z0-9]+[\s\-]*(credited|debited)(?:.*?)(Rs\.?|INR|₹)\s*([0-9,.]+)/i;
+      // Direct amount patterns with stronger UPI emphasis
       
-      // Pattern 3: Direct amount mention at beginning (Rs.300.00 is debited)
-      const directAmountPattern = /(Rs\.?|INR|₹)\s*([0-9,.]+)(?:.*?)(credited|debited|received|paid|sent|transfer|payment)/i;
+      // Pattern for UPI references
+      const upiRefPattern = /(?:upi ref|upi id|txn id|ref no|upi-p2p)/i;
+      const hasUpiRef = upiRefPattern.test(message);
       
-      // Pattern 4: Simple amount mention (150 rs.)
-      const simpleAmountPattern = /(\d+(?:\.\d+)?)\s*(?:rs\.?|rupees|inr|₹)/i;
+      // Pattern 1: Amount with Rs/INR/₹
+      const amountPattern = /(rs\.?|inr|₹)\s*([0-9,.]+)/i;
       
-      // Try all patterns
-      let match = message.match(standardPattern) || 
-                 message.match(accountPattern) || 
-                 message.match(directAmountPattern) ||
-                 message.match(simpleAmountPattern);
+      // Pattern 2: Numbers followed by rs.
+      const reverseAmountPattern = /([0-9,.]+)\s*(rs\.?|rupees|inr|₹)/i;
       
-      if (match) {
-        console.log("Match found:", match);
+      // Transaction type indicators
+      const creditTerms = /(credited|received|added|deposited|sent to you|paid to you|transferred to you)/i;
+      const debitTerms = /(debited|paid|sent|deducted|withdrawn|spent)/i;
+      
+      let amountMatch = message.match(amountPattern) || message.match(reverseAmountPattern);
+      let isCredit = creditTerms.test(message);
+      let isDebit = debitTerms.test(message);
+      
+      // If it's neither clearly credit nor debit but mentions UPI, try to infer
+      if (!isCredit && !isDebit && (isUpiRelated || hasUpiRef)) {
+        // Check for patterns like "received", "from", "to", "paid"
+        isCredit = /(?:received|from|credited to|added to)/i.test(message);
+        isDebit = /(?:paid to|sent to|payment to|spent at)/i.test(message);
         
-        // Extract amount based on which pattern matched
-        let amount = 0;
+        // If still ambiguous, default based on common UPI message structures
+        if (!isCredit && !isDebit) {
+          // Messages that start with "Payment" are usually debits
+          if (/^payment/i.test(message.trim())) {
+            isDebit = true;
+          }
+          // Messages with "received" or "credited" are typically credits
+          else if (/received|credited/i.test(message)) {
+            isCredit = true;
+          }
+        }
+      }
+      
+      // Simple numbers like "150 rs" without context
+      if (!amountMatch) {
+        const simpleAmount = /\b(\d+(?:\.\d+)?)\b/;
+        const simpleMatch = message.match(simpleAmount);
+        if (simpleMatch && (isUpiRelated || hasUpiRef)) {
+          amountMatch = simpleMatch;
+        }
+      }
+      
+      if (amountMatch) {
         let amountStr;
-        let actionWord = "";
-        
-        if (match === message.match(simpleAmountPattern)) {
-          // Simple amount pattern
-          amountStr = match[1];
-          // Default to income for simple patterns unless explicitly mentioned otherwise
-          actionWord = message.toLowerCase().includes("debit") || 
-                      message.toLowerCase().includes("paid") || 
-                      message.toLowerCase().includes("payment") ? 
-                      "debited" : "credited";
-        } else if (match === message.match(directAmountPattern)) {
-          // Direct amount pattern has amount in second group
-          amountStr = match[2];
-          actionWord = match[3].toLowerCase();
-        } else if (match === message.match(standardPattern) || match === message.match(accountPattern)) {
-          // Other patterns have amount in third group
-          amountStr = match[3];
-          actionWord = match[1].toLowerCase();
+        if (amountMatch === message.match(amountPattern)) {
+          amountStr = amountMatch[2]; // Rs.150 format
+        } else if (amountMatch === message.match(reverseAmountPattern)) {
+          amountStr = amountMatch[1]; // 150 Rs format
+        } else {
+          amountStr = amountMatch[1]; // Simple number
         }
         
-        // Remove commas and convert to number
-        amount = parseFloat(amountStr.replace(/,/g, ''));
+        // Clean and parse the amount
+        const cleanAmount = amountStr.replace(/,/g, '');
+        const amount = parseFloat(cleanAmount);
         
         if (isNaN(amount) || amount <= 0) {
           console.log("Invalid amount detected:", amountStr);
           return false;
         }
         
-        // Determine if this is income or expense
+        // Determine the transaction type
         let type: TransactionType = "expense";
-        if (actionWord.includes("credit") || 
-            actionWord.includes("receiv") || 
-            actionWord.includes("transfer from")) {
+        if (isCredit) {
           type = "income";
         }
         
-        // Extract possible sender/receiver name
-        let description = type === "income" ? "Income via SMS" : "Expense via SMS";
+        // Extract description from the message
+        let description = type === "income" ? "UPI Income" : "UPI Expense";
         
-        // Look for sender/receiver name patterns
-        const fromPattern = /(?:from|by|transfer from|received from)\s+([A-Za-z0-9\s]+)/i;
-        const toPattern = /(?:to|towards|paid to|sent to)\s+([A-Za-z0-9\s]+)/i;
+        // Look for entity names
+        const entityPatterns = [
+          /(?:from|by|received from)\s+([A-Za-z0-9\s&.]+?)(?:\s+via|\s+through|\s+using|\s+to|\s+on|$|\.|,)/i,
+          /(?:to|at|for)\s+([A-Za-z0-9\s&.]+?)(?:\s+via|\s+through|\s+using|\s+from|\s+on|$|\.|,)/i,
+          /(?:UPI ID:)\s+([a-zA-Z0-9@.]+)/i
+        ];
         
-        const fromMatch = message.match(fromPattern);
-        const toMatch = message.match(toPattern);
+        let entityName = "";
         
-        if (type === "income" && fromMatch) {
-          description = `From ${fromMatch[1].trim()}`;
-        } else if (type === "expense" && toMatch) {
-          description = `To ${toMatch[1].trim()}`;
+        for (const pattern of entityPatterns) {
+          const match = message.match(pattern);
+          if (match && match[1]) {
+            entityName = match[1].trim();
+            break;
+          }
         }
         
-        // Extract reference number if present
-        const refPattern = /(?:ref|reference|txn|transaction)(?:.*?)([A-Za-z0-9]+)/i;
-        const refMatch = message.match(refPattern);
-        
-        if (refMatch) {
-          description += ` (Ref: ${refMatch[1]})`;
+        // Fallback to UPI reference if no entity found
+        if (!entityName) {
+          const refMatch = message.match(/(?:ref|reference|txn|transaction|upi ref)(?:.*?)([A-Za-z0-9]+)/i);
+          if (refMatch) {
+            entityName = `Ref: ${refMatch[1]}`;
+          }
         }
+        
+        if (entityName) {
+          description = type === "income" 
+            ? `From ${entityName}` 
+            : `To ${entityName}`;
+        }
+        
+        // Add UPI tag
+        description += " (UPI)";
         
         console.log(`Detected transaction: ${type}, amount: ${amount}, description: ${description}`);
         
@@ -211,7 +243,7 @@ export const TransactionProvider: React.FC<{ children: React.ReactNode }> = ({ c
         setProcessedSMSHashes((prev) => new Set([...prev, smsHash]));
         
         toast({
-          title: "SMS Transaction Detected",
+          title: "UPI Transaction Detected",
           description: `${description}: ₹${amount}`,
         });
         
