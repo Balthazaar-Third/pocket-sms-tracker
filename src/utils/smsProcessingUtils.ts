@@ -76,13 +76,19 @@ export const determineTransactionType = (message: string): 'income' | 'expense' 
       } else if (/received|credited/i.test(message)) {
         return 'income';
       }
+      
+      // Last resort - check if "to" is present (likely payment to someone)
+      if (/\sto\s/i.test(message)) {
+        return 'expense';
+      }
     }
   }
   
   if (isCredit) return 'income';
   if (isDebit) return 'expense';
   
-  return null;
+  // Default to expense for ambiguous messages with amounts
+  return 'expense';
 };
 
 // Helper function to extract entity name from message

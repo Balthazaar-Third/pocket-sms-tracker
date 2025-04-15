@@ -35,8 +35,12 @@ export const processSMSMessage = (message: string): ProcessSMSResult => {
     const upiRefPattern = /(?:upi ref|upi id|txn id|ref no|upi-p2p)/i;
     const hasUpiRef = upiRefPattern.test(message);
     
-    // If not related to UPI or financial transaction, skip further processing
-    if (!isUpiRelated && !hasUpiRef && !/(?:credited|debited|paid|received|transferred|payment)/i.test(message)) {
+    // Check for transaction-related terms
+    const transactionTerms = /(?:credited|debited|paid|received|transferred|payment|rs\.?|inr|₹)/i;
+    const hasTransactionTerms = transactionTerms.test(message);
+    
+    // If not related to financial transaction, skip further processing
+    if (!isUpiRelated && !hasUpiRef && !hasTransactionTerms) {
       console.log("Message doesn't appear to be a financial transaction");
       return { transaction: null, smsHash };
     }

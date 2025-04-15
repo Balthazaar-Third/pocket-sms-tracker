@@ -87,6 +87,13 @@ export const TransactionProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
   // Process SMS messages to extract transaction information
   const processSMS = (message: string): boolean => {
+    // Ensure the message is not empty
+    if (!message.trim()) {
+      console.log("Empty message, skipping processing");
+      return false;
+    }
+    
+    console.log("Processing SMS in TransactionContext:", message);
     const { transaction, smsHash } = processSMSMessage(message);
     
     // Check if this SMS has already been processed
@@ -106,14 +113,15 @@ export const TransactionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       setProcessedSMSHashes((prev) => new Set([...prev, smsHash]));
       
       toast({
-        title: "UPI Transaction Detected",
+        title: "Transaction Detected",
         description: `${transaction.description}: ₹${transaction.amount}`,
       });
       
       return true;
+    } else {
+      console.log("No transaction detected in SMS");
+      return false;
     }
-    
-    return false;
   };
 
   return (
