@@ -3,6 +3,7 @@ import React, { createContext, useState, useContext, useEffect } from "react";
 import { Transaction, TransactionSummary, TransactionType } from "@/types/transaction";
 import { useToast } from "@/hooks/use-toast";
 import { v4 as uuidv4 } from "uuid";
+import { processSMSMessage } from "@/services/smsProcessingService";
 
 interface TransactionContextType {
   transactions: Transaction[];
@@ -84,178 +85,35 @@ export const TransactionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     });
   };
 
-  // Generate a simple hash for SMS message to avoid duplicates
-  const generateSMSHash = (message: string): string => {
-    return message.trim().replace(/\s+/g, ' ').toLowerCase();
-  };
-
   // Process SMS messages to extract transaction information
   const processSMS = (message: string): boolean => {
-    console.log("Processing SMS:", message);
+    const { transaction, smsHash } = processSMSMessage(message);
     
-    if (!message || typeof message !== 'string') {
-      console.error("Invalid SMS message:", message);
+    // Check if this SMS has already been processed
+    if (processedSMSHashes.has(smsHash)) {
+      console.log("SMS already processed, skipping:", smsHash);
+      toast({
+        title: "Already Processed",
+        description: "This SMS has already been processed",
+      });
       return false;
     }
     
-    try {
-      // Check if this SMS has already been processed
-      const smsHash = generateSMSHash(message);
-      if (processedSMSHashes.has(smsHash)) {
-        console.log("SMS already processed, skipping:", smsHash);
-        toast({
-          title: "Already Processed",
-          description: "This SMS has already been processed",
-        });
-        return false;
-      }
-
-      // ====== Pattern detection for transactions ======
+    if (transaction) {
+      setTransactions((prev) => [transaction, ...prev]);
       
-      // UPI-specific patterns
-      const upiPattern = /(?:upi|paytm|phonepe|googlepay|gpay)/i;
-      const isUpiRelated = upiPattern.test(message);
+      // Mark this SMS as processed
+      setProcessedSMSHashes((prev) => new Set([...prev, smsHash]));
       
-      // Direct amount patterns with stronger UPI emphasis
+      toast({
+        title: "UPI Transaction Detected",
+        description: `${transaction.description}: ₹${transaction.amount}`,
+      });
       
-      // Pattern for UPI references
-      const upiRefPattern = /(?:upi ref|upi id|txn id|ref no|upi-p2p)/i;
-      const hasUpiRef = upiRefPattern.test(message);
-      
-      // Pattern 1: Amount with Rs/INR/₹
-      const amountPattern = /(rs\.?|inr|₹)\s*([0-9,.]+)/i;
-      
-      // Pattern 2: Numbers followed by rs.
-      const reverseAmountPattern = /([0-9,.]+)\s*(rs\.?|rupees|inr|₹)/i;
-      
-      // Transaction type indicators
-      const creditTerms = /(credited|received|added|deposited|sent to you|paid to you|transferred to you)/i;
-      const debitTerms = /(debited|paid|sent|deducted|withdrawn|spent)/i;
-      
-      let amountMatch = message.match(amountPattern) || message.match(reverseAmountPattern);
-      let isCredit = creditTerms.test(message);
-      let isDebit = debitTerms.test(message);
-      
-      // If it's neither clearly credit nor debit but mentions UPI, try to infer
-      if (!isCredit && !isDebit && (isUpiRelated || hasUpiRef)) {
-        // Check for patterns like "received", "from", "to", "paid"
-        isCredit = /(?:received|from|credited to|added to)/i.test(message);
-        isDebit = /(?:paid to|sent to|payment to|spent at)/i.test(message);
-        
-        // If still ambiguous, default based on common UPI message structures
-        if (!isCredit && !isDebit) {
-          // Messages that start with "Payment" are usually debits
-          if (/^payment/i.test(message.trim())) {
-            isDebit = true;
-          }
-          // Messages with "received" or "credited" are typically credits
-          else if (/received|credited/i.test(message)) {
-            isCredit = true;
-          }
-        }
-      }
-      
-      // Simple numbers like "150 rs" without context
-      if (!amountMatch) {
-        const simpleAmount = /\b(\d+(?:\.\d+)?)\b/;
-        const simpleMatch = message.match(simpleAmount);
-        if (simpleMatch && (isUpiRelated || hasUpiRef)) {
-          amountMatch = simpleMatch;
-        }
-      }
-      
-      if (amountMatch) {
-        let amountStr;
-        if (amountMatch === message.match(amountPattern)) {
-          amountStr = amountMatch[2]; // Rs.150 format
-        } else if (amountMatch === message.match(reverseAmountPattern)) {
-          amountStr = amountMatch[1]; // 150 Rs format
-        } else {
-          amountStr = amountMatch[1]; // Simple number
-        }
-        
-        // Clean and parse the amount
-        const cleanAmount = amountStr.replace(/,/g, '');
-        const amount = parseFloat(cleanAmount);
-        
-        if (isNaN(amount) || amount <= 0) {
-          console.log("Invalid amount detected:", amountStr);
-          return false;
-        }
-        
-        // Determine the transaction type
-        let type: TransactionType = "expense";
-        if (isCredit) {
-          type = "income";
-        }
-        
-        // Extract description from the message
-        let description = type === "income" ? "UPI Income" : "UPI Expense";
-        
-        // Look for entity names
-        const entityPatterns = [
-          /(?:from|by|received from)\s+([A-Za-z0-9\s&.]+?)(?:\s+via|\s+through|\s+using|\s+to|\s+on|$|\.|,)/i,
-          /(?:to|at|for)\s+([A-Za-z0-9\s&.]+?)(?:\s+via|\s+through|\s+using|\s+from|\s+on|$|\.|,)/i,
-          /(?:UPI ID:)\s+([a-zA-Z0-9@.]+)/i
-        ];
-        
-        let entityName = "";
-        
-        for (const pattern of entityPatterns) {
-          const match = message.match(pattern);
-          if (match && match[1]) {
-            entityName = match[1].trim();
-            break;
-          }
-        }
-        
-        // Fallback to UPI reference if no entity found
-        if (!entityName) {
-          const refMatch = message.match(/(?:ref|reference|txn|transaction|upi ref)(?:.*?)([A-Za-z0-9]+)/i);
-          if (refMatch) {
-            entityName = `Ref: ${refMatch[1]}`;
-          }
-        }
-        
-        if (entityName) {
-          description = type === "income" 
-            ? `From ${entityName}` 
-            : `To ${entityName}`;
-        }
-        
-        // Add UPI tag
-        description += " (UPI)";
-        
-        console.log(`Detected transaction: ${type}, amount: ${amount}, description: ${description}`);
-        
-        const newTransaction: Transaction = {
-          id: uuidv4(),
-          amount,
-          description,
-          type,
-          date: new Date().toISOString(),
-          fromSMS: true,
-        };
-        
-        setTransactions((prev) => [newTransaction, ...prev]);
-        
-        // Mark this SMS as processed
-        setProcessedSMSHashes((prev) => new Set([...prev, smsHash]));
-        
-        toast({
-          title: "UPI Transaction Detected",
-          description: `${description}: ₹${amount}`,
-        });
-        
-        return true;
-      }
-      
-      console.log("No transaction pattern detected in SMS");
-      return false;
-    } catch (error) {
-      console.error("Error processing SMS:", error);
-      return false;
+      return true;
     }
+    
+    return false;
   };
 
   return (
