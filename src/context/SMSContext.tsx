@@ -67,11 +67,23 @@ export const SMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // Simulate a delay for scanning
       await new Promise((resolve) => setTimeout(resolve, 2000));
       
-      // Simulate no transactions found
-      toast({
-        title: "Scan Complete",
-        description: "No new transactions found.",
-      });
+      // For demo purposes, let's simulate finding a banking SMS
+      const sampleSMS = [
+        "Dear ABC User, your A/c X6161-credited by Rs.150 on 30Mar25 transfer from John Doe R Ref No 12345678900 -ABC",
+        "Rs.300.00 is debited from your account for purchase at CAFE COFFEE DAY on 25-03-25. Avl Bal: Rs.1250.20",
+        "Your account has been credited with Rs.1000 via UPI transfer from JAMES SMITH. Ref: UPI123456789"
+      ];
+      
+      // Randomly pick one of the sample SMS messages for simulation
+      const randomIndex = Math.floor(Math.random() * sampleSMS.length);
+      const foundTransaction = processSMS(sampleSMS[randomIndex]);
+      
+      if (!foundTransaction) {
+        toast({
+          title: "Scan Complete",
+          description: "No new transactions found.",
+        });
+      }
     } catch (error) {
       toast({
         title: "Error Reading SMS",
@@ -83,8 +95,15 @@ export const SMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Function to simulate receiving an SMS for testing
   const mockReceiveSMS = (message: string): void => {
-    processSMS(message);
-    // Note: The toast is shown inside processSMS
+    const transactionFound = processSMS(message);
+    
+    // Show toast only if no transaction was found (processSMS shows its own toast on success)
+    if (!transactionFound) {
+      toast({
+        title: "No Transaction Found",
+        description: "The SMS doesn't contain recognizable transaction information.",
+      });
+    }
   };
 
   return (
