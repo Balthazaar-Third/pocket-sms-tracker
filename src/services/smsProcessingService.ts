@@ -58,8 +58,10 @@ export const processSMSMessage = (message: string): ProcessSMSResult => {
     // Extract description
     let description = extractEntityName(message, type);
     
-    // Add UPI tag
-    description += " (UPI)";
+    // Add UPI tag if it's UPI-related
+    if (isUpiRelated || hasUpiRef) {
+      description += " (UPI)";
+    }
     
     console.log(`Detected transaction: ${type}, amount: ${amountInfo.amount}, description: ${description}`);
     
