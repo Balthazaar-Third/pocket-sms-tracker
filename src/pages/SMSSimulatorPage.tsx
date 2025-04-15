@@ -5,18 +5,23 @@ import { useSMS } from "@/context/SMSContext";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft } from "lucide-react";
-import { toast } from "sonner";
+import { useToast } from "@/hooks/use-toast";
 
 const SMSSimulatorPage: React.FC = () => {
   const [message, setMessage] = useState("");
   const { mockReceiveSMS, isPermissionGranted, requestPermission } = useSMS();
   const navigate = useNavigate();
+  const { toast } = useToast();
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!message.trim()) {
-      toast.error("Please enter an SMS message");
+      toast({
+        title: "Error",
+        description: "Please enter an SMS message",
+        variant: "destructive"
+      });
       return;
     }
     
@@ -38,6 +43,7 @@ const SMSSimulatorPage: React.FC = () => {
     "You have received Rs. 1000.00 from JOHN DOE to your account via UPI. Reference: UPI987654321.",
     "Your account has been debited for Rs. 350.50 towards UPI transfer to GROCERY MART.",
     "UPI: Rs. 750.00 credited to your account from ALICE SMITH. UPI Ref: 246813579.",
+    "Dear ABC User, your A/c X6161-credited by Rs.150 on 30Mar25 transfer from John Doe R Ref No 12345678900 -ABC"
   ];
 
   return (
